@@ -5,7 +5,6 @@ from flask import Blueprint, request, jsonify
 from app import db
 from app.models.product import Product
 from app.models.dispatch import Dispatch, DispatchItem
-from app.models.order import Order
 
 dispatch_bp = Blueprint("dispatch", __name__)
 
@@ -28,20 +27,16 @@ def _next_dispatch_number():
 def create_dispatch():
     """Start a new dispatch / loading session."""
     data = request.get_json()
-    required = ["order_id", "vehicle_number"]
-    for f in required:
-        if f not in data:
-            return jsonify({"error": f"Missing: {f}"}), 400
-
-    order = Order.query.get_or_404(data["order_id"])
+    if not data.get("client_name") or not data.get("vehicle_number"):
+        return jsonify({"error": "client_name and vehicle_number required"}), 400
 
     dispatch = Dispatch(
         dispatch_number=_next_dispatch_number(),
-        order_id=order.id,
-        client_name=order.client_name,
+        client_name=data["client_name"],
         vehicle_number=data["vehicle_number"],
         driver_name=data.get("driver_name"),
         driver_phone=data.get("driver_phone"),
+        created_by=data.get("created_by"),
     )
     db.session.add(dispatch)
     db.session.commit()
@@ -68,48 +63,72 @@ def scan_load(dispatch_id):
     if product.status == "Dispatched":
         return jsonify({"error": "Already dispatched", "valid": False}), 400
 
-    if product.status not in ("Allocated", "In Warehouse"):
-        return jsonify({"error": f"Product status '{product.status}' cannot be loaded", "valid": False}), 400
+    if product.status == "Loaded":
+        return jsonify({"error": "Already loaded on another dispatch", "valid": False}), 400
 
     # Check not already in this dispatch
     existing = DispatchItem.query.filter_by(dispatch_id=dispatch.id, product_id=product.id).first()
     if existing:
-        return jsonify({"error": "Already scanned for this dispatch", "valid": False}), 400
+        return jsonify({"error": "Duplicate scan — already scanned for this dispatch", "valid": False}), 400
 
-    item = DispatchItem(dispatch_id=dispatch.id, product_id=product.id, weight=product.weight)
+    item = DispatchItem(dispatch_id=dispatch.id, product_id=product.id, weight=product.net_weight)
     db.session.add(item)
 
     product.status = "Loaded"
-    dispatch.total_weight = sum(di.weight for di in dispatch.items) + product.weight
+    product.dispatch_id = dispatch.id
+    dispatch.total_items = len(dispatch.items) + 1
+    dispatch.total_weight = sum(di.weight for di in dispatch.items) + product.net_weight
     dispatch.status = "Loading"
     db.session.commit()
 
     return jsonify({
-        "message": "Product loaded",
+        "message": "Product loaded successfully",
         "valid": True,
         "product": product.to_dict(),
         "dispatch": dispatch.to_dict(),
     })
 
 
-@dispatch_bp.route("/<int:dispatch_id>/complete", methods=["POST"])
-def complete_dispatch(dispatch_id):
-    """Mark dispatch as complete — vehicle leaves."""
+@dispatch_bp.route("/<int:dispatch_id>/remove/<int:item_id>", methods=["DELETE"])
+def remove_item(dispatch_id, item_id):
+    """Remove a scanned item from the dispatch."""
     dispatch = Dispatch.query.get_or_404(dispatch_id)
+    if dispatch.status == "Dispatched":
+        return jsonify({"error": "Cannot modify completed dispatch"}), 400
+
+    item = DispatchItem.query.get_or_404(item_id)
+    if item.dispatch_id != dispatch.id:
+        return jsonify({"error": "Item does not belong to this dispatch"}), 400
+
+    # Revert product status
+    product = Product.query.get(item.product_id)
+    if product:
+        product.status = "In Warehouse"
+        product.dispatch_id = None
+
+    db.session.delete(item)
+    dispatch.total_items = max(0, len(dispatch.items) - 1)
+    dispatch.total_weight = max(0, sum(di.weight for di in dispatch.items) - item.weight)
+    db.session.commit()
+
+    return jsonify({"message": "Item removed", "dispatch": dispatch.to_dict()})
+
+
+@dispatch_bp.route("/<int:dispatch_id>/finalize", methods=["POST"])
+def finalize_dispatch(dispatch_id):
+    """Finalize dispatch — vehicle leaves, products marked Dispatched."""
+    dispatch = Dispatch.query.get_or_404(dispatch_id)
+
+    if not dispatch.items:
+        return jsonify({"error": "No items loaded"}), 400
 
     for item in dispatch.items:
         item.product.status = "Dispatched"
 
     dispatch.status = "Dispatched"
-
-    # Update order status
-    order = Order.query.get(dispatch.order_id)
-    if order:
-        order.status = "Dispatched"
-
     db.session.commit()
 
-    return jsonify({"message": "Dispatch completed", "dispatch": dispatch.to_dict()})
+    return jsonify({"message": "Dispatch finalized", "dispatch": dispatch.to_dict()})
 
 
 @dispatch_bp.route("/", methods=["GET"])
@@ -122,6 +141,14 @@ def list_dispatches():
     return jsonify([d.to_dict() for d in dispatches])
 
 
+@dispatch_bp.route("/history", methods=["GET"])
+def dispatch_history():
+    """Get dispatched (completed) dispatches for history page."""
+    query = Dispatch.query.filter(Dispatch.status == "Dispatched")
+    dispatches = query.order_by(Dispatch.created_at.desc()).all()
+    return jsonify([d.to_dict() for d in dispatches])
+
+
 @dispatch_bp.route("/<int:dispatch_id>", methods=["GET"])
 def get_dispatch(dispatch_id):
     dispatch = Dispatch.query.get_or_404(dispatch_id)
@@ -130,28 +157,49 @@ def get_dispatch(dispatch_id):
 
 @dispatch_bp.route("/<int:dispatch_id>/sheet", methods=["GET"])
 def dispatch_sheet(dispatch_id):
-    """Generate dispatch summary document data."""
+    """Generate packing slip / dispatch summary data."""
     dispatch = Dispatch.query.get_or_404(dispatch_id)
 
     products = []
+    summary = {}  # Group by quality+colour+type
     for item in dispatch.items:
-        products.append({
-            "product_number": item.product.product_number,
-            "product_type": item.product.product_type,
-            "gsm": item.product.gsm,
-            "colour": item.product.colour,
-            "width": item.product.width,
-            "weight": item.weight,
-        })
+        p = item.product
+        prod_data = {
+            "product_number": p.product_number,
+            "product_type": p.product_type,
+            "gsm": p.gsm,
+            "colour": p.colour,
+            "quality": p.quality,
+            "width": p.width,
+            "length": p.length,
+            "gross_weight": p.gross_weight,
+            "net_weight": item.weight,
+        }
+        products.append(prod_data)
+
+        # Build grouped summary
+        key = f"{p.quality}|{p.colour}|{p.product_type}"
+        if key not in summary:
+            summary[key] = {
+                "quality": p.quality,
+                "colour": p.colour,
+                "product_type": p.product_type,
+                "count": 0,
+                "total_weight": 0,
+            }
+        summary[key]["count"] += 1
+        summary[key]["total_weight"] = round(summary[key]["total_weight"] + item.weight, 2)
 
     return jsonify({
         "dispatch_number": dispatch.dispatch_number,
         "client_name": dispatch.client_name,
         "vehicle_number": dispatch.vehicle_number,
         "driver_name": dispatch.driver_name,
+        "driver_phone": dispatch.driver_phone,
         "dispatch_date": dispatch.dispatch_date.isoformat(),
         "status": dispatch.status,
         "products": products,
+        "summary": list(summary.values()),
         "total_weight": dispatch.total_weight,
-        "total_items": len(products),
+        "total_items": dispatch.total_items,
     })

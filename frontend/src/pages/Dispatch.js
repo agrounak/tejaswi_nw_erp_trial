@@ -1,140 +1,208 @@
-import React, { useState, useEffect } from "react";
-import { createDispatch, listDispatches, listOrders, completeDispatch, getDispatchSheet } from "../services/api";
+import React, { useState, useEffect, useRef } from "react";
+import { createDispatch, scanLoad, removeDispatchItem, finalizeDispatch, listDispatches } from "../services/api";
 
 function Dispatch() {
-  const [dispatches, setDispatches] = useState([]);
-  const [orders, setOrders] = useState([]);
-  const [form, setForm] = useState({ order_id: "", vehicle_number: "", driver_name: "", driver_phone: "" });
-  const [msg, setMsg] = useState("");
-  const [sheet, setSheet] = useState(null);
+  const [clientName, setClientName] = useState("");
+  const [vehicleNumber, setVehicleNumber] = useState("");
+  const [driverPhone, setDriverPhone] = useState("");
+  const [activeDispatch, setActiveDispatch] = useState(null);
+  const [scanInput, setScanInput] = useState("");
+  const [scanResult, setScanResult] = useState(null);
+  const [loadedItems, setLoadedItems] = useState([]);
+  const [error, setError] = useState("");
+  const scanRef = useRef(null);
 
-  const load = () => {
-    listDispatches().then((r) => setDispatches(r.data)).catch(console.error);
-    listOrders({ status: "Allocated" }).then((r) => setOrders(r.data)).catch(console.error);
-  };
-  useEffect(load, []);
+  // Load any existing Loading dispatch
+  useEffect(() => {
+    listDispatches({ status: "Loading" }).then((r) => {
+      if (r.data.length > 0) {
+        const d = r.data[0];
+        setActiveDispatch(d);
+        setLoadedItems(d.items);
+        setClientName(d.client_name);
+        setVehicleNumber(d.vehicle_number);
+        setDriverPhone(d.driver_phone || "");
+      }
+    }).catch(console.error);
+  }, []);
 
-  const handleCreate = async (e) => {
+  const handleStartDispatch = async (e) => {
     e.preventDefault();
+    setError("");
+    if (!clientName || !vehicleNumber) {
+      setError("Client name and vehicle number are required");
+      return;
+    }
     try {
-      await createDispatch(form);
-      setMsg("Dispatch created — go to Loading page to scan items");
-      setForm({ order_id: "", vehicle_number: "", driver_name: "", driver_phone: "" });
-      load();
+      const res = await createDispatch({
+        client_name: clientName,
+        vehicle_number: vehicleNumber,
+        driver_phone: driverPhone,
+      });
+      setActiveDispatch(res.data.dispatch);
+      setLoadedItems([]);
+      setTimeout(() => scanRef.current?.focus(), 100);
     } catch (err) {
-      setMsg(err.response?.data?.error || "Error");
+      setError(err.response?.data?.error || "Failed to create dispatch");
     }
   };
 
-  const handleComplete = async (id) => {
+  const handleScan = async (e) => {
+    e.preventDefault();
+    if (!activeDispatch || !scanInput.trim()) return;
+    setScanResult(null);
+
     try {
-      await completeDispatch(id);
-      setMsg("Dispatch completed");
-      load();
+      const res = await scanLoad(activeDispatch.id, { product_number: scanInput.trim() });
+      setScanResult({ success: true, message: res.data.message, product: res.data.product });
+      setLoadedItems(res.data.dispatch.items);
+      setActiveDispatch(res.data.dispatch);
+      setScanInput("");
     } catch (err) {
-      setMsg(err.response?.data?.error || "Error");
+      setScanResult({
+        success: false,
+        message: err.response?.data?.error || "Scan failed",
+      });
+      setScanInput("");
     }
   };
 
-  const viewSheet = async (id) => {
+  const handleRemoveItem = async (itemId) => {
     try {
-      const res = await getDispatchSheet(id);
-      setSheet(res.data);
+      const res = await removeDispatchItem(activeDispatch.id, itemId);
+      setLoadedItems(res.data.dispatch.items);
+      setActiveDispatch(res.data.dispatch);
     } catch (err) {
-      setMsg("Error loading sheet");
+      alert(err.response?.data?.error || "Remove failed");
+    }
+  };
+
+  const handleFinalize = async () => {
+    if (!window.confirm("Finalize this dispatch? Products will be marked as DISPATCHED.")) return;
+    try {
+      const res = await finalizeDispatch(activeDispatch.id);
+      setActiveDispatch(null);
+      setLoadedItems([]);
+      setClientName("");
+      setVehicleNumber("");
+      setDriverPhone("");
+      setScanResult(null);
+      alert(`Dispatch ${res.data.dispatch.dispatch_number} finalized!`);
+    } catch (err) {
+      alert(err.response?.data?.error || "Finalize failed");
     }
   };
 
   return (
     <div>
-      <div className="page-header"><h1>Dispatch Management</h1></div>
+      <div className="page-header"><h1>Dispatch</h1></div>
 
-      <div className="card">
-        <h3>Create New Dispatch</h3>
-        {msg && <p style={{ marginBottom: 8, color: msg.includes("Error") ? "red" : "green" }}>{msg}</p>}
-        <form onSubmit={handleCreate}>
-          <div className="form-grid">
-            <div className="form-group">
-              <label>Order</label>
-              <select value={form.order_id} onChange={(e) => setForm({ ...form, order_id: e.target.value })} required>
-                <option value="">Select Order</option>
-                {orders.map((o) => (
-                  <option key={o.id} value={o.id}>{o.order_number} — {o.client_name}</option>
-                ))}
-              </select>
+      {/* Start Dispatch Form */}
+      {!activeDispatch && (
+        <div className="card">
+          <h3>Start New Dispatch</h3>
+          <form onSubmit={handleStartDispatch}>
+            <div className="form-grid">
+              <div className="form-group">
+                <label>Client Name</label>
+                <input value={clientName} onChange={(e) => setClientName(e.target.value)} required placeholder="e.g. Shyam Traders" />
+              </div>
+              <div className="form-group">
+                <label>Vehicle Number</label>
+                <input value={vehicleNumber} onChange={(e) => setVehicleNumber(e.target.value)} required placeholder="e.g. BR09AB1234" />
+              </div>
+              <div className="form-group">
+                <label>Driver Contact Number</label>
+                <input value={driverPhone} onChange={(e) => setDriverPhone(e.target.value)} placeholder="e.g. 9876543210" />
+              </div>
             </div>
-            <div className="form-group">
-              <label>Vehicle Number</label>
-              <input value={form.vehicle_number} onChange={(e) => setForm({ ...form, vehicle_number: e.target.value })} placeholder="BR09AB1234" required />
-            </div>
-            <div className="form-group">
-              <label>Driver Name</label>
-              <input value={form.driver_name} onChange={(e) => setForm({ ...form, driver_name: e.target.value })} />
-            </div>
-            <div className="form-group">
-              <label>Driver Phone</label>
-              <input value={form.driver_phone} onChange={(e) => setForm({ ...form, driver_phone: e.target.value })} />
+            {error && <p style={{ color: "#e74c3c", marginTop: 8 }}>{error}</p>}
+            <button className="btn btn-primary" type="submit" style={{ marginTop: 14 }}>Start Dispatch</button>
+          </form>
+        </div>
+      )}
+
+      {/* Active Dispatch */}
+      {activeDispatch && (
+        <>
+          <div className="card">
+            <h3>Active Dispatch — {activeDispatch.dispatch_number}</h3>
+            <div className="dispatch-summary">
+              <span>Client: <strong>{activeDispatch.client_name}</strong></span>
+              <span>Vehicle: <strong>{activeDispatch.vehicle_number}</strong></span>
+              {activeDispatch.driver_phone && <span>Driver: <strong>{activeDispatch.driver_phone}</strong></span>}
             </div>
           </div>
-          <button className="btn btn-primary" type="submit" style={{ marginTop: 12 }}>Create Dispatch</button>
-        </form>
-      </div>
 
-      <div className="card">
-        <h3>Dispatches ({dispatches.length})</h3>
-        <table>
-          <thead>
-            <tr><th>Dispatch #</th><th>Client</th><th>Vehicle</th><th>Date</th><th>Items</th><th>Weight</th><th>Status</th><th>Actions</th></tr>
-          </thead>
-          <tbody>
-            {dispatches.map((d) => (
-              <tr key={d.id}>
-                <td><strong>{d.dispatch_number}</strong></td>
-                <td>{d.client_name}</td>
-                <td>{d.vehicle_number}</td>
-                <td>{d.dispatch_date}</td>
-                <td>{d.items.length}</td>
-                <td className="weight-highlight">{d.total_weight} kg</td>
-                <td><span className={`badge badge-${d.status.toLowerCase()}`}>{d.status}</span></td>
-                <td>
-                  {d.status === "Loading" && (
-                    <button className="btn btn-sm btn-success" onClick={() => handleComplete(d.id)}>Complete</button>
+          {/* QR Scanner */}
+          <div className="card">
+            <h3>Scan QR Code</h3>
+            <div className="scan-area">
+              <form onSubmit={handleScan}>
+                <input
+                  ref={scanRef}
+                  value={scanInput}
+                  onChange={(e) => setScanInput(e.target.value)}
+                  placeholder="Scan or type Product ID..."
+                  autoFocus
+                />
+                <br /><br />
+                <button className="btn btn-success" type="submit">Verify & Load</button>
+              </form>
+              {scanResult && (
+                <div className={`scan-result ${scanResult.success ? "scan-success" : "scan-error"}`}>
+                  <strong>{scanResult.success ? "VALID" : "INVALID"}</strong> — {scanResult.message}
+                  {scanResult.product && (
+                    <div style={{ marginTop: 8, fontSize: 13 }}>
+                      {scanResult.product.product_number} | {scanResult.product.product_type} |
+                      {scanResult.product.gsm} GSM | {scanResult.product.colour} | {scanResult.product.net_weight} kg
+                    </div>
                   )}
-                  {" "}
-                  <button className="btn btn-sm btn-primary" onClick={() => viewSheet(d.id)}>Sheet</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                </div>
+              )}
+            </div>
+          </div>
 
-      {/* Dispatch Sheet Modal */}
-      {sheet && (
-        <div className="card" style={{ border: "2px solid #0f3460" }}>
-          <h3>Dispatch Sheet: {sheet.dispatch_number}</h3>
-          <p><strong>Client:</strong> {sheet.client_name}</p>
-          <p><strong>Vehicle:</strong> {sheet.vehicle_number}</p>
-          <p><strong>Driver:</strong> {sheet.driver_name || "—"}</p>
-          <p><strong>Date:</strong> {sheet.dispatch_date}</p>
-          <table>
-            <thead>
-              <tr><th>Product ID</th><th>Type</th><th>GSM</th><th>Colour</th><th>Width</th><th>Weight</th></tr>
-            </thead>
-            <tbody>
-              {sheet.products.map((p, i) => (
-                <tr key={i}>
-                  <td>{p.product_number}</td><td>{p.product_type}</td><td>{p.gsm}</td>
-                  <td>{p.colour}</td><td>{p.width}"</td><td>{p.weight} kg</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <p style={{ marginTop: 12, fontSize: 18, fontWeight: 700 }}>
-            Total: {sheet.total_items} items | {sheet.total_weight} kg
-          </p>
-          <button className="btn btn-sm btn-danger" onClick={() => setSheet(null)} style={{ marginTop: 8 }}>Close</button>
-        </div>
+          {/* Loaded Items */}
+          <div className="card">
+            <h3>Scanned Items</h3>
+            <div className="dispatch-summary">
+              <span>Items: <strong>{activeDispatch.total_items || loadedItems.length}</strong></span>
+              <span>Total Weight: <strong>{activeDispatch.total_weight || 0} kg</strong></span>
+            </div>
+            <table>
+              <thead>
+                <tr><th>#</th><th>Product No</th><th>Color</th><th>Quality</th><th>Weight</th><th>Action</th></tr>
+              </thead>
+              <tbody>
+                {loadedItems.map((item, i) => (
+                  <tr key={item.id}>
+                    <td>{i + 1}</td>
+                    <td><strong>{item.product_number}</strong></td>
+                    <td>{item.colour}</td>
+                    <td>{item.quality}</td>
+                    <td>{item.weight} kg</td>
+                    <td>
+                      <button className="btn btn-danger btn-xs" onClick={() => handleRemoveItem(item.id)}>
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {loadedItems.length === 0 && (
+                  <tr><td colSpan={6} style={{ textAlign: "center", padding: 16 }}>No items scanned yet</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="btn-group">
+            <button className="btn btn-success" onClick={handleFinalize} disabled={loadedItems.length === 0}>
+              Finalize Dispatch
+            </button>
+          </div>
+        </>
       )}
     </div>
   );

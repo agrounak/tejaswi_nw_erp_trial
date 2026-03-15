@@ -1,18 +1,17 @@
 """
 Product Number Generator for Tejaswi Nonwovens.
 
-Format: {Shift}-{Day}{MonthCode}-{SequenceNumber}
-Example: A-15MY-023
+Format: {Shift}{Day}{MonthCode}{SequenceNumber}
+Example: A15MY038
 
 Parts:
   A       = Shift (A or B)
   15      = Day of month
-  MY      = Month code (JA, FE, MR, AP, MY, JN, JL, AU, SE, OC, NV, DE)
-  023     = Sequence number within that shift+day
+  MY      = Month code
+  038     = Sequence number within that shift+day
 """
 
 from datetime import date
-from app import db
 from app.models.product import Product
 
 MONTH_CODES = {
@@ -21,23 +20,24 @@ MONTH_CODES = {
 }
 
 
-def generate_product_number(shift: str, production_date: date) -> str:
+def generate_product_number(shift: str, production_date: date) -> tuple:
+    """Generate product number and return (product_number, serial_no)."""
     day = production_date.day
     month_code = MONTH_CODES[production_date.month]
 
-    prefix = f"{shift}-{day:02d}{month_code}"
+    prefix = f"{shift}{day:02d}{month_code}"
 
     last_product = (
         Product.query
-        .filter(Product.product_number.like(f"{prefix}-%"))
-        .order_by(Product.product_number.desc())
+        .filter(Product.product_number.like(f"{prefix}%"))
+        .order_by(Product.serial_no.desc())
         .first()
     )
 
     if last_product:
-        last_seq = int(last_product.product_number.split("-")[-1])
-        next_seq = last_seq + 1
+        next_seq = last_product.serial_no + 1
     else:
         next_seq = 1
 
-    return f"{prefix}-{next_seq:03d}"
+    product_number = f"{prefix}{next_seq:03d}"
+    return product_number, next_seq

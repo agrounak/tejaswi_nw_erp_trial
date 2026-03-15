@@ -6,7 +6,7 @@ QR-based tracking from production to dispatch.
 ## Workflow
 
 ```
-Production → Sticker/QR → Warehouse → Order Allocation → Loading (QR Scan) → Dispatch
+Production → Sticker/QR → Inventory → Dispatch (QR Scan) → Packing Slip → Dispatch History
 ```
 
 ## Quick Start
@@ -16,56 +16,72 @@ Production → Sticker/QR → Warehouse → Order Allocation → Loading (QR Sca
 ```bash
 cd backend
 python -m venv venv
-source venv/bin/activate    # Windows: venv\Scripts\activate
+source venv/bin/activate
 pip install -r requirements.txt
-python run.py               # Starts on http://localhost:5000
+python seed_data.py           # Seeds admin user, configs, and sample products
+python run.py                 # Starts on http://localhost:5000
 ```
 
-To seed sample data:
-```bash
-python seed_data.py
-```
+Default admin login: `admin` / `admin123`
 
 ### Frontend (React)
 
 ```bash
 cd frontend
 npm install
-npm start                   # Starts on http://localhost:3000
+npm start                     # Starts on http://localhost:3000
 ```
+
+## User Roles
+
+| Role          | Access                                    |
+|---------------|-------------------------------------------|
+| Admin         | Full system (all pages + user management) |
+| Sticker User  | Sticker Generator + Inventory view        |
+| Dispatch User | Dispatch + Inventory view                 |
+
+## System Modules
+
+| Page               | Description                                        |
+|--------------------|----------------------------------------------------|
+| Dashboard          | Production, inventory, and dispatch stats           |
+| Register User      | Create users with role assignment (Admin only)      |
+| Sticker Generator  | Production entry form + QR sticker generation       |
+| Inventory          | Stock listing with search, edit, view, export       |
+| Dispatch           | QR scan loading with validation                     |
+| Dispatched History | Past dispatches with packing slips                  |
+| Admin Config       | Manage dropdown options (quality, colour, etc.)     |
 
 ## API Endpoints
 
-| Module     | Endpoint                          | Method | Description               |
-|------------|-----------------------------------|--------|---------------------------|
-| Production | `/api/production/entry`           | POST   | Register new roll/patti   |
-| Production | `/api/production/products`        | GET    | List products (filterable)|
-| Production | `/api/production/scan/<number>`   | GET    | Lookup by product number  |
-| Inventory  | `/api/inventory/receive`          | POST   | Scan into warehouse       |
-| Inventory  | `/api/inventory/stock`            | GET    | Current warehouse stock   |
-| Inventory  | `/api/inventory/summary`          | GET    | Aggregated summary        |
-| Inventory  | `/api/inventory/locations`        | GET    | Warehouse location map    |
-| Orders     | `/api/orders/`                    | POST   | Create sales order        |
-| Orders     | `/api/orders/`                    | GET    | List orders               |
-| Orders     | `/api/orders/<id>/allocate`       | POST   | Auto-allocate inventory   |
-| Dispatch   | `/api/dispatch/create`            | POST   | Start dispatch session    |
-| Dispatch   | `/api/dispatch/<id>/scan`         | POST   | Scan product onto truck   |
-| Dispatch   | `/api/dispatch/<id>/complete`     | POST   | Complete dispatch         |
-| Dispatch   | `/api/dispatch/<id>/sheet`        | GET    | Dispatch summary sheet    |
-| Sticker    | `/api/sticker/<product_id>`       | GET    | Download sticker PNG      |
-| Dashboard  | `/api/dashboard/summary`          | GET    | Factory dashboard data    |
+| Module     | Endpoint                              | Method | Description               |
+|------------|---------------------------------------|--------|---------------------------|
+| Auth       | `/api/auth/login`                     | POST   | User login                |
+| Auth       | `/api/auth/register`                  | POST   | Create user               |
+| Production | `/api/production/entry`               | POST   | Register new roll/patti   |
+| Production | `/api/production/products`            | GET    | List products (paginated) |
+| Production | `/api/production/products/<id>`       | PUT    | Update product            |
+| Production | `/api/production/products/<id>`       | DELETE | Delete product            |
+| Inventory  | `/api/inventory/stock`                | GET    | Paginated inventory       |
+| Inventory  | `/api/inventory/export`               | GET    | CSV export                |
+| Dispatch   | `/api/dispatch/create`                | POST   | Start dispatch session    |
+| Dispatch   | `/api/dispatch/<id>/scan`             | POST   | Scan product onto truck   |
+| Dispatch   | `/api/dispatch/<id>/remove/<item>`    | DELETE | Remove scanned item       |
+| Dispatch   | `/api/dispatch/<id>/finalize`         | POST   | Finalize dispatch         |
+| Dispatch   | `/api/dispatch/history`               | GET    | Completed dispatches      |
+| Dispatch   | `/api/dispatch/<id>/sheet`            | GET    | Packing slip data         |
+| Config     | `/api/config/`                        | GET    | List config options       |
+| Config     | `/api/config/`                        | POST   | Add config option         |
+| Config     | `/api/config/seed`                    | POST   | Seed default options      |
+| Sticker    | `/api/sticker/<product_id>`           | GET    | Download sticker PNG      |
+| Dashboard  | `/api/dashboard/summary`              | GET    | Factory dashboard data    |
 
 ## Product Number Format
 
 ```
-{Shift}-{Day}{MonthCode}-{Sequence}
-Example: A-15MR-023
+{Shift}{Day}{MonthCode}{Sequence}
+Example: A15MR038
 ```
-
-- Shift: A or B
-- Day: 01-31
-- Month code: JA, FE, MR, AP, MY, JN, JL, AU, SE, OC, NV, DE
-- Sequence: Auto-incrementing per shift+day
 
 ## Product Status Flow
 
@@ -77,4 +93,5 @@ Manufactured → Sticker Printed → In Warehouse → Allocated → Loaded → D
 
 - **Backend**: Flask, SQLAlchemy, SQLite (dev) / PostgreSQL (prod)
 - **Frontend**: React, React Router, Axios
-- **QR/Sticker**: qrcode + Pillow (generates 4x6 inch thermal sticker PNGs)
+- **QR/Sticker**: qrcode + Pillow (4x6 inch thermal sticker PNGs)
+- **Auth**: werkzeug password hashing

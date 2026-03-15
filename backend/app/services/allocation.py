@@ -3,7 +3,6 @@ Allocation service: picks available rolls/pattis to fulfil an order item.
 Greedy by weight — picks largest available units first until target is met.
 """
 
-from app import db
 from app.models.product import Product
 
 
@@ -19,7 +18,7 @@ def allocate_products(product_type: str, gsm: int, colour: str,
     if width:
         query = query.filter(Product.width == width)
 
-    available = query.order_by(Product.weight.desc()).all()
+    available = query.order_by(Product.net_weight.desc()).all()
 
     selected = []
     total = 0.0
@@ -27,6 +26,6 @@ def allocate_products(product_type: str, gsm: int, colour: str,
         if total >= quantity_kg:
             break
         selected.append(product)
-        total += product.weight
+        total += product.net_weight
 
     return selected, total

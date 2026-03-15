@@ -4,7 +4,6 @@ from datetime import datetime, timezone
 from flask import Blueprint, request, jsonify
 from app import db
 from app.models.order import Order, OrderItem
-from app.models.product import Product
 from app.services.allocation import allocate_products
 
 orders_bp = Blueprint("orders", __name__)

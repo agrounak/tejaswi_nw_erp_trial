@@ -1,120 +1,236 @@
-import React, { useState, useEffect } from "react";
-import { getStock, getInventorySummary, receiveToWarehouse, getWarehouseLocations } from "../services/api";
+import React, { useState, useEffect, useCallback } from "react";
+import { getStock, updateProduct, deleteProduct, getStickerPreviewUrl, exportInventory } from "../services/api";
+
+function StatusBadge({ status }) {
+  const cls = {
+    "Manufactured": "badge-manufactured",
+    "Sticker Printed": "badge-sticker",
+    "In Warehouse": "badge-warehouse",
+    "Allocated": "badge-allocated",
+    "Loaded": "badge-loaded",
+    "Dispatched": "badge-dispatched",
+  }[status] || "";
+  return <span className={`badge ${cls}`}>{status}</span>;
+}
 
 function Inventory() {
-  const [stock, setStock] = useState([]);
-  const [summary, setSummary] = useState([]);
-  const [locations, setLocations] = useState([]);
-  const [scanInput, setScanInput] = useState("");
-  const [locationInput, setLocationInput] = useState("");
-  const [msg, setMsg] = useState("");
-  const [filters, setFilters] = useState({ gsm: "", colour: "", product_type: "" });
+  const [products, setProducts] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
+  const [search, setSearch] = useState("");
+  const [editModal, setEditModal] = useState(null);
+  const [viewModal, setViewModal] = useState(null);
 
-  const load = () => {
-    const params = {};
-    if (filters.gsm) params.gsm = filters.gsm;
-    if (filters.colour) params.colour = filters.colour;
-    if (filters.product_type) params.product_type = filters.product_type;
-    getStock(params).then((r) => setStock(r.data)).catch(console.error);
-    getInventorySummary().then((r) => setSummary(r.data)).catch(console.error);
-    getWarehouseLocations().then((r) => setLocations(r.data)).catch(console.error);
+  const fetchStock = useCallback(() => {
+    getStock({ page, per_page: 25, search: search || undefined })
+      .then((r) => {
+        setProducts(r.data.products);
+        setTotal(r.data.total);
+        setPages(r.data.pages);
+      })
+      .catch(console.error);
+  }, [page, search]);
+
+  useEffect(() => { fetchStock(); }, [fetchStock]);
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Delete this product?")) return;
+    try {
+      await deleteProduct(id);
+      fetchStock();
+    } catch (err) {
+      alert(err.response?.data?.error || "Delete failed");
+    }
   };
 
-  useEffect(load, [filters]);
-
-  const handleReceive = async (e) => {
-    e.preventDefault();
+  const handleEditSave = async () => {
     try {
-      const res = await receiveToWarehouse({ product_number: scanInput, location: locationInput });
-      setMsg(`Received: ${res.data.product.product_number} at ${res.data.product.location}`);
-      setScanInput(""); setLocationInput("");
-      load();
+      await updateProduct(editModal.id, editModal);
+      setEditModal(null);
+      fetchStock();
     } catch (err) {
-      setMsg(err.response?.data?.error || "Error");
+      alert(err.response?.data?.error || "Update failed");
     }
+  };
+
+  const renderPagination = () => {
+    if (pages <= 1) return null;
+    const btns = [];
+    btns.push(
+      <button key="prev" disabled={page <= 1} onClick={() => setPage(page - 1)}>&laquo;</button>
+    );
+    const start = Math.max(1, page - 2);
+    const end = Math.min(pages, page + 2);
+    for (let i = start; i <= end; i++) {
+      btns.push(
+        <button key={i} className={i === page ? "active" : ""} onClick={() => setPage(i)}>{i}</button>
+      );
+    }
+    if (end < pages) {
+      btns.push(<span key="dots">...</span>);
+      btns.push(<button key={pages} onClick={() => setPage(pages)}>{pages}</button>);
+    }
+    btns.push(
+      <button key="next" disabled={page >= pages} onClick={() => setPage(page + 1)}>&raquo;</button>
+    );
+    return <div className="pagination">{btns}</div>;
   };
 
   return (
     <div>
-      <div className="page-header"><h1>Inventory</h1></div>
-
-      {/* Receive to Warehouse */}
-      <div className="card">
-        <h3>Scan to Warehouse</h3>
-        {msg && <p style={{ color: msg.startsWith("Received") ? "green" : "red", marginBottom: 8 }}>{msg}</p>}
-        <form onSubmit={handleReceive} style={{ display: "flex", gap: 12, alignItems: "flex-end" }}>
-          <div className="form-group">
-            <label>Product Number (QR)</label>
-            <input value={scanInput} onChange={(e) => setScanInput(e.target.value)} placeholder="A-15MR-001" required />
-          </div>
-          <div className="form-group">
-            <label>Location</label>
-            <input value={locationInput} onChange={(e) => setLocationInput(e.target.value)} placeholder="A-01" required />
-          </div>
-          <button className="btn btn-success" type="submit">Receive</button>
-        </form>
-      </div>
-
-      {/* Summary */}
-      <div className="card">
-        <h3>Inventory Summary</h3>
-        <table>
-          <thead><tr><th>Type</th><th>GSM</th><th>Colour</th><th>Units</th><th>Total Weight</th></tr></thead>
-          <tbody>
-            {summary.map((s, i) => (
-              <tr key={i}>
-                <td>{s.product_type}</td><td>{s.gsm}</td><td>{s.colour}</td>
-                <td>{s.count}</td><td className="weight-highlight">{s.total_weight} kg</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Warehouse Map */}
-      <div className="card">
-        <h3>Warehouse Locations</h3>
-        <div className="stats-grid">
-          {locations.map((l) => (
-            <div className="stat-card" key={l.location}>
-              <div className="stat-value">{l.count}</div>
-              <div className="stat-label">{l.location} ({l.total_weight} kg)</div>
-            </div>
-          ))}
-          {locations.length === 0 && <p>No products in warehouse</p>}
+      <div className="page-header">
+        <h1>Inventory ({total})</h1>
+        <div className="btn-group">
+          <input
+            type="text"
+            placeholder="Search product no..."
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            style={{ padding: "8px 12px", border: "1px solid #ddd", borderRadius: 4 }}
+          />
+          <a href={exportInventory()} className="btn btn-secondary btn-sm" download>
+            Export CSV
+          </a>
         </div>
       </div>
 
-      {/* Stock Details */}
-      <div className="card">
-        <h3>Stock Detail</h3>
-        <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
-          <select value={filters.product_type} onChange={(e) => setFilters({ ...filters, product_type: e.target.value })}>
-            <option value="">All Types</option><option>Roll</option><option>Patti</option>
-          </select>
-          <input placeholder="GSM" type="number" value={filters.gsm}
-            onChange={(e) => setFilters({ ...filters, gsm: e.target.value })} style={{ width: 80 }} />
-          <select value={filters.colour} onChange={(e) => setFilters({ ...filters, colour: e.target.value })}>
-            <option value="">All Colours</option>
-            {["White","Blue","Green","Yellow","Red"].map(c => <option key={c}>{c}</option>)}
-          </select>
-        </div>
+      <div className="card" style={{ overflowX: "auto" }}>
         <table>
           <thead>
-            <tr><th>Product ID</th><th>Type</th><th>GSM</th><th>Colour</th><th>Width</th><th>Weight</th><th>Location</th></tr>
+            <tr>
+              <th>Product No</th>
+              <th>Color</th>
+              <th>Quality</th>
+              <th>Type</th>
+              <th>Length</th>
+              <th>Width</th>
+              <th>Gross Wt</th>
+              <th>Net Wt</th>
+              <th>GSM</th>
+              <th>Laminated</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
           </thead>
           <tbody>
-            {stock.map((p) => (
+            {products.map((p) => (
               <tr key={p.id}>
                 <td><strong>{p.product_number}</strong></td>
-                <td>{p.product_type}</td><td>{p.gsm}</td><td>{p.colour}</td>
-                <td>{p.width}"</td><td>{p.weight} kg</td><td>{p.location}</td>
+                <td>{p.colour}</td>
+                <td>{p.quality}</td>
+                <td>{p.product_type}</td>
+                <td>{p.length || "-"}</td>
+                <td>{p.width || "-"}</td>
+                <td>{p.gross_weight}</td>
+                <td><strong>{p.net_weight}</strong></td>
+                <td>{p.gsm}</td>
+                <td>{p.laminated ? "Yes" : "No"}</td>
+                <td><StatusBadge status={p.status} /></td>
+                <td>
+                  <div className="action-icons">
+                    <button className="icon-btn" title="View Sticker" onClick={() => setViewModal(p)}>
+                      &#128065;
+                    </button>
+                    <button className="icon-btn" title="Edit" onClick={() => setEditModal({ ...p })}>
+                      &#9998;
+                    </button>
+                    <button className="icon-btn" title="Delete" onClick={() => handleDelete(p.id)}>
+                      &#128465;
+                    </button>
+                  </div>
+                </td>
               </tr>
             ))}
-            {stock.length === 0 && <tr><td colSpan={7}>No stock found</td></tr>}
+            {products.length === 0 && (
+              <tr><td colSpan={12} style={{ textAlign: "center", padding: 20 }}>No inventory found</td></tr>
+            )}
           </tbody>
         </table>
+        {renderPagination()}
       </div>
+
+      {/* View Sticker Modal */}
+      {viewModal && (
+        <div className="modal-overlay" onClick={() => setViewModal(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Sticker — {viewModal.product_number}</h2>
+              <button className="modal-close" onClick={() => setViewModal(null)}>&times;</button>
+            </div>
+            <div className="sticker-preview">
+              <img
+                src={getStickerPreviewUrl(viewModal.id)}
+                alt={`Sticker ${viewModal.product_number}`}
+                style={{ maxWidth: "100%" }}
+              />
+            </div>
+            <div className="btn-group" style={{ marginTop: 16, justifyContent: "center" }}>
+              <a href={`http://localhost:5000/api/sticker/${viewModal.id}`} className="btn btn-primary btn-sm" download>
+                Download
+              </a>
+              <button className="btn btn-secondary btn-sm" onClick={() => window.print()}>Print</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editModal && (
+        <div className="modal-overlay" onClick={() => setEditModal(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Edit — {editModal.product_number}</h2>
+              <button className="modal-close" onClick={() => setEditModal(null)}>&times;</button>
+            </div>
+            <div className="form-grid">
+              {[
+                { label: "Product Type", key: "product_type", type: "select", options: ["Roll", "Patti"] },
+                { label: "Colour", key: "colour" },
+                { label: "Quality", key: "quality" },
+                { label: "Length (m)", key: "length", type: "number" },
+                { label: "Width (inch)", key: "width", type: "number" },
+                { label: "Gross Weight", key: "gross_weight", type: "number" },
+                { label: "Net Weight", key: "net_weight", type: "number" },
+              ].map((f) => (
+                <div className="form-group" key={f.key}>
+                  <label>{f.label}</label>
+                  {f.type === "select" ? (
+                    <select
+                      value={editModal[f.key] || ""}
+                      onChange={(e) => setEditModal({ ...editModal, [f.key]: e.target.value })}
+                    >
+                      {f.options.map((o) => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  ) : (
+                    <input
+                      type={f.type || "text"}
+                      step={f.type === "number" ? "0.1" : undefined}
+                      value={editModal[f.key] ?? ""}
+                      onChange={(e) => setEditModal({ ...editModal, [f.key]: e.target.value })}
+                    />
+                  )}
+                </div>
+              ))}
+              <div className="form-group">
+                <label>Laminated</label>
+                <div className="checkbox-group">
+                  <input
+                    type="checkbox"
+                    checked={editModal.laminated || false}
+                    onChange={(e) => setEditModal({ ...editModal, laminated: e.target.checked })}
+                  />
+                  <span>Yes</span>
+                </div>
+              </div>
+            </div>
+            <div className="btn-group" style={{ marginTop: 16 }}>
+              <button className="btn btn-primary" onClick={handleEditSave}>Save Changes</button>
+              <button className="btn btn-secondary" onClick={() => setEditModal(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

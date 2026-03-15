@@ -7,43 +7,49 @@ class Product(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     product_number = db.Column(db.String(50), unique=True, nullable=False, index=True)
-    product_type = db.Column(db.String(20), nullable=False)  # Roll / Patti
+    trading_name = db.Column(db.String(100), nullable=False, default="Bharat Green")
+    shift = db.Column(db.String(1), nullable=False)  # A or B
+    production_date = db.Column(db.Date, nullable=False)
+    serial_no = db.Column(db.Integer, nullable=False, default=0)
+    quality = db.Column(db.String(50), nullable=False, default="Regular")
     gsm = db.Column(db.Integer, nullable=False)
-    width = db.Column(db.Float, nullable=False)  # in inches
     colour = db.Column(db.String(50), nullable=False)
-    weight = db.Column(db.Float, nullable=False)  # in kg
-    shift = db.Column(db.String(1), nullable=False)  # A / B
-    machine = db.Column(db.String(10), nullable=False)  # S1 / S2
-    quality = db.Column(db.String(20), nullable=False, default="Regular")
-    production_date = db.Column(db.Date, nullable=False, default=datetime.now(timezone.utc).date)
-    location = db.Column(db.String(20), nullable=True)  # Warehouse location e.g. A-01
+    product_type = db.Column(db.String(20), nullable=False)  # Roll or Patti
+    gross_weight = db.Column(db.Float, nullable=False, default=0)
+    net_weight = db.Column(db.Float, nullable=False, default=0)
+    length = db.Column(db.Float, nullable=True)  # meters
+    width = db.Column(db.Float, nullable=True)  # inches
+    laminated = db.Column(db.Boolean, default=False)
+    machine = db.Column(db.String(20), nullable=True)
+    location = db.Column(db.String(50), nullable=True)
     status = db.Column(
-        db.String(20), nullable=False, default="Manufactured"
+        db.String(30), nullable=False, default="Manufactured"
     )  # Manufactured, Sticker Printed, In Warehouse, Allocated, Loaded, Dispatched
+    dispatch_id = db.Column(db.Integer, db.ForeignKey("dispatches.id"), nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = db.Column(
-        db.DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
-    )
 
-    # Relationships
     dispatch_items = db.relationship("DispatchItem", back_populates="product")
 
     def to_dict(self):
         return {
             "id": self.id,
             "product_number": self.product_number,
-            "product_type": self.product_type,
-            "gsm": self.gsm,
-            "width": self.width,
-            "colour": self.colour,
-            "weight": self.weight,
+            "trading_name": self.trading_name,
             "shift": self.shift,
-            "machine": self.machine,
+            "production_date": self.production_date.isoformat() if self.production_date else None,
+            "serial_no": self.serial_no,
             "quality": self.quality,
-            "production_date": self.production_date.isoformat(),
+            "gsm": self.gsm,
+            "colour": self.colour,
+            "product_type": self.product_type,
+            "gross_weight": self.gross_weight,
+            "net_weight": self.net_weight,
+            "length": self.length,
+            "width": self.width,
+            "laminated": self.laminated,
+            "machine": self.machine,
             "location": self.location,
             "status": self.status,
+            "dispatch_id": self.dispatch_id,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }

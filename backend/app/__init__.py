@@ -23,6 +23,8 @@ def create_app(config_name="development"):
     from app.routes.dispatch import dispatch_bp
     from app.routes.dashboard import dashboard_bp
     from app.routes.sticker import sticker_bp
+    from app.routes.auth import auth_bp
+    from app.routes.admin_config import admin_config_bp
 
     app.register_blueprint(production_bp, url_prefix="/api/production")
     app.register_blueprint(inventory_bp, url_prefix="/api/inventory")
@@ -30,5 +32,7 @@ def create_app(config_name="development"):
     app.register_blueprint(dispatch_bp, url_prefix="/api/dispatch")
     app.register_blueprint(dashboard_bp, url_prefix="/api/dashboard")
     app.register_blueprint(sticker_bp, url_prefix="/api/sticker")
+    app.register_blueprint(auth_bp, url_prefix="/api/auth")
+    app.register_blueprint(admin_config_bp, url_prefix="/api/config")
 
     return app
