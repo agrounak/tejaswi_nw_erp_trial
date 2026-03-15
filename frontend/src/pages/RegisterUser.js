@@ -41,10 +41,10 @@ function RegisterUser() {
     <div>
       <div className="page-header"><h1>Register User</h1></div>
 
-      <div className="card" style={{ maxWidth: 500 }}>
+      <div className="card" style={{ maxWidth: 480 }}>
         <h3>Create New User</h3>
         <form onSubmit={handleSubmit}>
-          <div className="form-group" style={{ marginBottom: 14 }}>
+          <div className="form-group" style={{ marginBottom: 16 }}>
             <label>User Name</label>
             <input
               value={form.username}
@@ -53,7 +53,7 @@ function RegisterUser() {
               placeholder="Enter username"
             />
           </div>
-          <div className="form-group" style={{ marginBottom: 14 }}>
+          <div className="form-group" style={{ marginBottom: 16 }}>
             <label>Password</label>
             <input
               type="password"
@@ -63,7 +63,7 @@ function RegisterUser() {
               placeholder="Enter password"
             />
           </div>
-          <div className="form-group" style={{ marginBottom: 14 }}>
+          <div className="form-group" style={{ marginBottom: 20 }}>
             <label>Role</label>
             <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
               <option value="Admin">Admin</option>
@@ -71,14 +71,16 @@ function RegisterUser() {
               <option value="Dispatch User">Dispatch User</option>
             </select>
           </div>
-          {message && <p style={{ color: "#27ae60", marginBottom: 8 }}>{message}</p>}
-          {error && <p style={{ color: "#e74c3c", marginBottom: 8 }}>{error}</p>}
+          {message && <div className="scan-result scan-success" style={{ marginBottom: 12 }}>{message}</div>}
+          {error && <div className="scan-result scan-error" style={{ marginBottom: 12 }}>{error}</div>}
           <button className="btn btn-primary" type="submit">Sign Up</button>
         </form>
       </div>
 
-      <div className="card">
-        <h3>Existing Users</h3>
+      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+        <div style={{ padding: "16px 24px 0" }}>
+          <h3 style={{ borderBottom: "none", paddingBottom: 0, marginBottom: 0 }}>Existing Users</h3>
+        </div>
         <table>
           <thead>
             <tr><th>Username</th><th>Role</th><th>Created</th><th>Action</th></tr>
@@ -96,6 +98,9 @@ function RegisterUser() {
                 </td>
               </tr>
             ))}
+            {users.length === 0 && (
+              <tr><td colSpan={4} style={{ textAlign: "center", padding: 24, color: "#a0aec0" }}>No users found</td></tr>
+            )}
           </tbody>
         </table>
       </div>

@@ -69,11 +69,11 @@ function AdminConfig() {
 
       {/* Add New */}
       <div className="card">
-        <h3>Add New Option</h3>
+        <h3>Add New Field</h3>
         <form onSubmit={handleAdd}>
-          <div className="form-row">
+          <div className="dispatch-form-row" style={{ alignItems: "flex-end" }}>
             <div className="form-group">
-              <label>Type</label>
+              <label>Select Type</label>
               <select
                 value={form.config_type}
                 onChange={(e) => setForm({ ...form, config_type: e.target.value })}
@@ -84,7 +84,7 @@ function AdminConfig() {
               </select>
             </div>
             <div className="form-group">
-              <label>Name</label>
+              <label>Enter Name</label>
               <input
                 value={form.value}
                 onChange={(e) => setForm({ ...form, value: e.target.value })}
@@ -95,19 +95,21 @@ function AdminConfig() {
             {form.config_type === "colour" && (
               <div className="form-group">
                 <label>Is White?</label>
-                <div className="checkbox-group">
+                <div className="checkbox-group" style={{ paddingTop: 6 }}>
                   <input
                     type="checkbox"
                     checked={form.is_white}
                     onChange={(e) => setForm({ ...form, is_white: e.target.checked })}
                   />
-                  <span>Yes (for billing)</span>
+                  <span style={{ fontSize: 13 }}>Yes (billing flag)</span>
                 </div>
               </div>
             )}
-            <button className="btn btn-primary" type="submit">Add</button>
+            <div className="form-group" style={{ justifyContent: "flex-end" }}>
+              <button className="btn btn-primary" type="submit">Add</button>
+            </div>
           </div>
-          {error && <p style={{ color: "#e74c3c", marginTop: 8 }}>{error}</p>}
+          {error && <p style={{ color: "#e74c3c", marginTop: 10, fontSize: 13 }}>{error}</p>}
         </form>
       </div>
 
@@ -120,15 +122,15 @@ function AdminConfig() {
               <div className="config-item" key={c.id}>
                 <span>{c.value}</span>
                 {type.value === "colour" && c.is_white && (
-                  <span style={{ fontSize: 10, color: "#888" }}>(white)</span>
+                  <span style={{ fontSize: 10, color: "#a0aec0", fontStyle: "italic" }}>(white)</span>
                 )}
                 <button className="delete-btn" onClick={() => handleDelete(c.id)} title="Delete">
-                  &times;
+                  {"\u00D7"}
                 </button>
               </div>
             ))}
             {grouped[type.value].length === 0 && (
-              <span style={{ color: "#999", fontSize: 13 }}>No options configured</span>
+              <span style={{ color: "#a0aec0", fontSize: 13 }}>No options configured</span>
             )}
           </div>
         </div>

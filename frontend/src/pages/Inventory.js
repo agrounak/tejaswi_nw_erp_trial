@@ -58,7 +58,7 @@ function Inventory() {
     if (pages <= 1) return null;
     const btns = [];
     btns.push(
-      <button key="prev" disabled={page <= 1} onClick={() => setPage(page - 1)}>&laquo;</button>
+      <button key="prev" disabled={page <= 1} onClick={() => setPage(page - 1)}>{"\u2039"}</button>
     );
     const start = Math.max(1, page - 2);
     const end = Math.min(pages, page + 2);
@@ -72,116 +72,167 @@ function Inventory() {
       btns.push(<button key={pages} onClick={() => setPage(pages)}>{pages}</button>);
     }
     btns.push(
-      <button key="next" disabled={page >= pages} onClick={() => setPage(page + 1)}>&raquo;</button>
+      <button key="next" disabled={page >= pages} onClick={() => setPage(page + 1)}>{"\u203A"}</button>
     );
     return <div className="pagination">{btns}</div>;
   };
 
+  const fmtNum = (v) => v != null ? Number(v).toFixed(2) : "-";
+
   return (
     <div>
       <div className="page-header">
-        <h1>Inventory ({total})</h1>
-        <div className="btn-group">
-          <input
-            type="text"
-            placeholder="Search product no..."
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            style={{ padding: "8px 12px", border: "1px solid #ddd", borderRadius: 4 }}
-          />
-          <a href={exportInventory()} className="btn btn-secondary btn-sm" download>
-            Export CSV
+        <h1>Inventory</h1>
+        <div className="btn-group" style={{ alignItems: "center" }}>
+          <div className="search-bar">
+            <span className="search-icon">{"\u2315"}</span>
+            <input
+              type="text"
+              placeholder="Search..."
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            />
+          </div>
+          <a href={exportInventory()} className="btn-export" download>
+            Export Inventory
           </a>
         </div>
       </div>
 
-      <div className="card" style={{ overflowX: "auto" }}>
-        <table>
-          <thead>
-            <tr>
-              <th>Product No</th>
-              <th>Color</th>
-              <th>Quality</th>
-              <th>Type</th>
-              <th>Length</th>
-              <th>Width</th>
-              <th>Gross Wt</th>
-              <th>Net Wt</th>
-              <th>GSM</th>
-              <th>Laminated</th>
-              <th>Status</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {products.map((p) => (
-              <tr key={p.id}>
-                <td><strong>{p.product_number}</strong></td>
-                <td>{p.colour}</td>
-                <td>{p.quality}</td>
-                <td>{p.product_type}</td>
-                <td>{p.length || "-"}</td>
-                <td>{p.width || "-"}</td>
-                <td>{p.gross_weight}</td>
-                <td><strong>{p.net_weight}</strong></td>
-                <td>{p.gsm}</td>
-                <td>{p.laminated ? "Yes" : "No"}</td>
-                <td><StatusBadge status={p.status} /></td>
-                <td>
-                  <div className="action-icons">
-                    <button className="icon-btn" title="View Sticker" onClick={() => setViewModal(p)}>
-                      &#128065;
-                    </button>
-                    <button className="icon-btn" title="Edit" onClick={() => setEditModal({ ...p })}>
-                      &#9998;
-                    </button>
-                    <button className="icon-btn" title="Delete" onClick={() => handleDelete(p.id)}>
-                      &#128465;
-                    </button>
-                  </div>
-                </td>
+      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+        <div style={{ overflowX: "auto" }}>
+          <table>
+            <thead>
+              <tr>
+                <th>Product No.</th>
+                <th>Color</th>
+                <th>Quality</th>
+                <th>Type</th>
+                <th>Length</th>
+                <th>Width</th>
+                <th>Gross Weight</th>
+                <th>Net Weight</th>
+                <th>GSM</th>
+                <th>Laminated</th>
+                <th>Action</th>
               </tr>
-            ))}
-            {products.length === 0 && (
-              <tr><td colSpan={12} style={{ textAlign: "center", padding: 20 }}>No inventory found</td></tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {products.map((p) => (
+                <tr key={p.id}>
+                  <td><strong>{p.product_number}</strong></td>
+                  <td>{p.colour}</td>
+                  <td>{p.quality}</td>
+                  <td>{p.product_type}</td>
+                  <td>{fmtNum(p.length)}</td>
+                  <td>{fmtNum(p.width)}</td>
+                  <td>{fmtNum(p.gross_weight)}</td>
+                  <td>{fmtNum(p.net_weight)}</td>
+                  <td>{p.gsm}</td>
+                  <td>{p.laminated ? "Yes" : "No"}</td>
+                  <td>
+                    <div className="action-icons">
+                      <button className="icon-btn view" title="View Invoice" onClick={() => setViewModal(p)}>
+                        {"\u25CE"}
+                      </button>
+                      <button className="icon-btn edit" title="Edit" onClick={() => setEditModal({ ...p })}>
+                        {"\u270E"}
+                      </button>
+                      <button className="icon-btn delete" title="Delete" onClick={() => handleDelete(p.id)}>
+                        {"\u2717"}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {products.length === 0 && (
+                <tr><td colSpan={11} style={{ textAlign: "center", padding: 40, color: "#a0aec0" }}>No inventory found</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
         {renderPagination()}
       </div>
 
-      {/* View Sticker Modal */}
+      {/* ── Inventory Invoice Modal (matches screenshot) ── */}
       {viewModal && (
         <div className="modal-overlay" onClick={() => setViewModal(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal invoice-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Sticker — {viewModal.product_number}</h2>
-              <button className="modal-close" onClick={() => setViewModal(null)}>&times;</button>
+              <h2>Inventory Invoice</h2>
+              <button className="modal-close" onClick={() => setViewModal(null)}>{"\u00D7"}</button>
             </div>
-            <div className="sticker-preview">
-              <img
-                src={getStickerPreviewUrl(viewModal.id)}
-                alt={`Sticker ${viewModal.product_number}`}
-                style={{ maxWidth: "100%" }}
-              />
+
+            {/* Header: Brand left, QR right */}
+            <div className="invoice-header">
+              <div className="invoice-brand">
+                <h2>BHARAT</h2>
+                <p>MADE IN INDIA</p>
+                <p>Manufactured by</p>
+                <p className="company">Tejaswi Nonwovens Pvt Ltd</p>
+              </div>
+              <div className="invoice-qr">
+                <img
+                  src={getStickerPreviewUrl(viewModal.id)}
+                  alt="QR Code"
+                  style={{ width: 140, height: 140, objectFit: "contain" }}
+                />
+              </div>
             </div>
-            <div className="btn-group" style={{ marginTop: 16, justifyContent: "center" }}>
-              <a href={`http://localhost:5000/api/sticker/${viewModal.id}`} className="btn btn-primary btn-sm" download>
-                Download
+
+            {/* 2-column detail table */}
+            <table className="invoice-table">
+              <tbody>
+                <tr>
+                  <td className="label">Product No</td>
+                  <td className="value">: {viewModal.product_number}</td>
+                  <td className="label">Colour</td>
+                  <td className="value">: {viewModal.colour}</td>
+                </tr>
+                <tr>
+                  <td className="label">Length</td>
+                  <td className="value">: {fmtNum(viewModal.length)}</td>
+                  <td className="label">Width</td>
+                  <td className="value">: {fmtNum(viewModal.width)}</td>
+                </tr>
+                <tr>
+                  <td className="label">Quality</td>
+                  <td className="value">: {viewModal.quality}</td>
+                  <td className="label">GSM</td>
+                  <td className="value">: {viewModal.gsm}</td>
+                </tr>
+                <tr>
+                  <td className="label">Gross Weight</td>
+                  <td className="value">: {fmtNum(viewModal.gross_weight)}</td>
+                  <td className="label">Net Weight</td>
+                  <td className="value">: {fmtNum(viewModal.net_weight)}</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div className="invoice-actions">
+              <button className="btn btn-primary btn-sm" onClick={() => window.print()}>
+                {"\uD83D\uDDA8"} Print
+              </button>
+              <a
+                href={`${process.env.REACT_APP_API_URL || "http://localhost:5000/api"}/sticker/${viewModal.id}`}
+                className="btn btn-secondary btn-sm"
+                download
+              >
+                Download Sticker
               </a>
-              <button className="btn btn-secondary btn-sm" onClick={() => window.print()}>Print</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Edit Modal */}
+      {/* ── Edit Modal ── */}
       {editModal && (
         <div className="modal-overlay" onClick={() => setEditModal(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Edit — {editModal.product_number}</h2>
-              <button className="modal-close" onClick={() => setEditModal(null)}>&times;</button>
+              <h2>Edit Product &mdash; {editModal.product_number}</h2>
+              <button className="modal-close" onClick={() => setEditModal(null)}>{"\u00D7"}</button>
             </div>
             <div className="form-grid">
               {[
@@ -205,7 +256,7 @@ function Inventory() {
                   ) : (
                     <input
                       type={f.type || "text"}
-                      step={f.type === "number" ? "0.1" : undefined}
+                      step={f.type === "number" ? "0.01" : undefined}
                       value={editModal[f.key] ?? ""}
                       onChange={(e) => setEditModal({ ...editModal, [f.key]: e.target.value })}
                     />
@@ -214,7 +265,7 @@ function Inventory() {
               ))}
               <div className="form-group">
                 <label>Laminated</label>
-                <div className="checkbox-group">
+                <div className="checkbox-group" style={{ paddingTop: 6 }}>
                   <input
                     type="checkbox"
                     checked={editModal.laminated || false}
@@ -224,7 +275,7 @@ function Inventory() {
                 </div>
               </div>
             </div>
-            <div className="btn-group" style={{ marginTop: 16 }}>
+            <div className="btn-group" style={{ marginTop: 20 }}>
               <button className="btn btn-primary" onClick={handleEditSave}>Save Changes</button>
               <button className="btn btn-secondary" onClick={() => setEditModal(null)}>Cancel</button>
             </div>

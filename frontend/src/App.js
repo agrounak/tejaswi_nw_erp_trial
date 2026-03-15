@@ -39,24 +39,71 @@ function App() {
       <div className="app">
         <nav className="sidebar">
           <div className="sidebar-header">
-            <h2>Tejaswi NW</h2>
-            <span className="subtitle">Factory ERP</span>
+            <div className="sidebar-logo">T</div>
+            <div className="sidebar-header-text">
+              <h2>Tejaswi NonWovens</h2>
+            </div>
           </div>
           <ul className="nav-links">
-            <li><NavLink to="/" end>Dashboard</NavLink></li>
-            {isAdmin && <li><NavLink to="/register">Register User</NavLink></li>}
-            {isSticker && <li><NavLink to="/sticker">Sticker Generator</NavLink></li>}
-            <li><NavLink to="/inventory">Inventory</NavLink></li>
-            {isDispatch && <li><NavLink to="/dispatch">Dispatch</NavLink></li>}
-            {isDispatch && <li><NavLink to="/dispatch-history">Dispatched History</NavLink></li>}
-            {isAdmin && <li><NavLink to="/admin-config">Admin Config</NavLink></li>}
+            <li>
+              <NavLink to="/" end>
+                <span className="nav-icon">{"\u2302"}</span>
+                <span>DashBoard</span>
+              </NavLink>
+            </li>
+            {isAdmin && (
+              <li>
+                <NavLink to="/register">
+                  <span className="nav-icon">{"\u2630"}</span>
+                  <span>Register User</span>
+                </NavLink>
+              </li>
+            )}
+            {isSticker && (
+              <li>
+                <NavLink to="/sticker">
+                  <span className="nav-icon">{"\u2591"}</span>
+                  <span>Sticker Generator</span>
+                </NavLink>
+              </li>
+            )}
+            <li>
+              <NavLink to="/inventory">
+                <span className="nav-icon">{"\u2610"}</span>
+                <span>Inventory</span>
+              </NavLink>
+            </li>
+            {isDispatch && (
+              <li>
+                <NavLink to="/dispatch">
+                  <span className="nav-icon">{"\u27F6"}</span>
+                  <span>Dispatch</span>
+                </NavLink>
+              </li>
+            )}
+            {isDispatch && (
+              <li>
+                <NavLink to="/dispatch-history">
+                  <span className="nav-icon">{"\u29D6"}</span>
+                  <span>Dispatched History</span>
+                </NavLink>
+              </li>
+            )}
+            {isAdmin && (
+              <li>
+                <NavLink to="/admin-config">
+                  <span className="nav-icon">{"\u2699"}</span>
+                  <span>Admin Config</span>
+                </NavLink>
+              </li>
+            )}
           </ul>
           <div className="sidebar-footer">
             <div className="user-info">
               <span className="user-role">{user.role}</span>
               <span className="user-name">{user.username}</span>
             </div>
-            <button className="btn btn-sm btn-logout" onClick={handleLogout}>Logout</button>
+            <button className="btn-logout" onClick={handleLogout}>Logout</button>
           </div>
         </nav>
         <main className="content">
