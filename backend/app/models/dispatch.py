@@ -7,8 +7,8 @@ class Dispatch(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     dispatch_number = db.Column(db.String(50), unique=True, nullable=False, index=True)
-    client_name = db.Column(db.String(200), nullable=False)
-    vehicle_number = db.Column(db.String(50), nullable=False)
+    client_name = db.Column(db.String(200), nullable=True)
+    vehicle_number = db.Column(db.String(50), nullable=True)
     driver_name = db.Column(db.String(100), nullable=True)
     driver_phone = db.Column(db.String(20), nullable=True)
     dispatch_date = db.Column(db.Date, nullable=False, default=lambda: datetime.now(timezone.utc).date())
@@ -26,8 +26,8 @@ class Dispatch(db.Model):
         return {
             "id": self.id,
             "dispatch_number": self.dispatch_number,
-            "client_name": self.client_name,
-            "vehicle_number": self.vehicle_number,
+            "client_name": self.client_name or "",
+            "vehicle_number": self.vehicle_number or "",
             "driver_name": self.driver_name,
             "driver_phone": self.driver_phone,
             "dispatch_date": self.dispatch_date.isoformat(),

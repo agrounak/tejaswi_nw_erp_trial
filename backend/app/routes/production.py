@@ -44,7 +44,7 @@ def create_product():
         laminated=bool(data.get("laminated", False)),
         machine=data.get("machine"),
         location=data.get("location"),
-        status="Manufactured",
+        status="In Warehouse",
     )
     db.session.add(product)
     db.session.commit()

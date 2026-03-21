@@ -19,23 +19,20 @@ export const deleteProduct = (id) => api.delete(`/production/products/${id}`);
 export const scanProduct = (productNumber) => api.get(`/production/scan/${productNumber}`);
 
 // ── Inventory ──
-export const receiveToWarehouse = (data) => api.post("/inventory/receive", data);
 export const getStock = (params) => api.get("/inventory/stock", { params });
 export const getInventorySummary = () => api.get("/inventory/summary");
 export const getWarehouseLocations = () => api.get("/inventory/locations");
 export const exportInventory = () => `${API_BASE}/inventory/export`;
 
-// ── Orders ──
-export const createOrder = (data) => api.post("/orders/", data);
-export const listOrders = (params) => api.get("/orders/", { params });
-export const getOrder = (id) => api.get(`/orders/${id}`);
-export const allocateOrder = (id) => api.post(`/orders/${id}/allocate`);
-
 // ── Dispatch ──
+export const startDispatch = (data) => api.post("/dispatch/start", data);
 export const createDispatch = (data) => api.post("/dispatch/create", data);
+export const updateDispatchDetails = (id, data) => api.put(`/dispatch/${id}/details`, data);
 export const scanLoad = (dispatchId, data) => api.post(`/dispatch/${dispatchId}/scan`, data);
 export const removeDispatchItem = (dispatchId, itemId) => api.delete(`/dispatch/${dispatchId}/remove/${itemId}`);
 export const finalizeDispatch = (id) => api.post(`/dispatch/${id}/finalize`);
+export const getRoughSlip = (id) => api.post(`/dispatch/${id}/rough-slip`);
+export const getFinalSlip = (id) => api.post(`/dispatch/${id}/final-slip`);
 export const listDispatches = (params) => api.get("/dispatch/", { params });
 export const getDispatchHistory = () => api.get("/dispatch/history");
 export const getDispatch = (id) => api.get(`/dispatch/${id}`);
@@ -47,6 +44,7 @@ export const getStickerPreviewUrl = (productId) => `${API_BASE}/sticker/${produc
 
 // ── Dashboard ──
 export const getDashboardSummary = () => api.get("/dashboard/summary");
+export const getDashboardAnalytics = (params) => api.get("/dashboard/analytics", { params });
 
 // ── Admin Config ──
 export const getConfigs = (type) => api.get("/config/", { params: type ? { type } : {} });

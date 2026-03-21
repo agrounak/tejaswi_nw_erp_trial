@@ -37,7 +37,7 @@ def receive_to_warehouse():
 @inventory_bp.route("/stock", methods=["GET"])
 def get_stock():
     """Get current inventory with filters and pagination."""
-    query = Product.query.filter(Product.status.in_(["In Warehouse", "Manufactured", "Sticker Printed"]))
+    query = Product.query.filter(Product.status.in_(["In Warehouse"]))
 
     for field in ["product_type", "gsm", "colour", "quality", "location"]:
         value = request.args.get(field)
@@ -85,7 +85,7 @@ def inventory_summary():
             func.count(Product.id).label("count"),
             func.sum(Product.net_weight).label("total_weight"),
         )
-        .filter(Product.status.in_(["In Warehouse", "Manufactured", "Sticker Printed"]))
+        .filter(Product.status.in_(["In Warehouse"]))
         .group_by(Product.product_type, Product.gsm, Product.colour, Product.quality)
         .all()
     )
@@ -132,7 +132,7 @@ def warehouse_map():
 @inventory_bp.route("/export", methods=["GET"])
 def export_inventory():
     """Export inventory as CSV."""
-    query = Product.query.filter(Product.status.in_(["In Warehouse", "Manufactured", "Sticker Printed"]))
+    query = Product.query.filter(Product.status.in_(["In Warehouse"]))
     products = query.order_by(Product.product_number).all()
 
     output = io.StringIO()

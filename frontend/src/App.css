@@ -332,10 +332,35 @@ tbody tr:hover { background: #f7fafc; }
   .dispatch-form-row { flex-direction: column; }
 }
 
+/* ── Dashboard Tabs ── */
+.dashboard-tabs { display: flex; gap: 4px; }
+.tab-btn {
+  padding: 8px 20px; border: 1px solid #e2e8f0; background: #fff; border-radius: 6px;
+  cursor: pointer; font-size: 13px; font-weight: 600; color: #4a5568; transition: all .15s;
+}
+.tab-btn:hover { background: #f7fafc; border-color: #cbd5e0; }
+.tab-btn.active { background: #1e1e2d; color: #fff; border-color: #1e1e2d; }
+
+/* ── Sticker success badge ── */
+.sticker-success-badge {
+  display: inline-block; padding: 6px 16px; border-radius: 20px;
+  background: #d1fae5; color: #065f46; font-size: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .5px; margin-bottom: 20px;
+}
+
+/* ── Packing slip badges ── */
+.slip-badge {
+  display: inline-block; padding: 3px 10px; border-radius: 4px;
+  font-size: 11px; font-weight: 700; margin-left: 10px; vertical-align: middle;
+}
+.slip-rough { background: #fef3cd; color: #856404; }
+.slip-final { background: #d1fae5; color: #065f46; }
+
 /* ── Print styles ── */
 @media print {
   .sidebar, .page-header, .btn-group, .action-icons, .pagination,
-  .modal-close, .invoice-actions, .search-bar, .btn-export { display: none !important; }
+  .modal-close, .invoice-actions, .search-bar, .btn-export,
+  .dashboard-tabs { display: none !important; }
   .content { margin: 0; padding: 0; width: 100%; }
   .modal-overlay { position: static; background: none; }
   .modal { box-shadow: none; max-width: 100%; padding: 0; }

@@ -20,7 +20,7 @@ function StickerGenerator() {
     location: "",
     laminated: false,
   });
-  const [createdProduct, setCreatedProduct] = useState(null);
+  const [stickerModal, setStickerModal] = useState(null);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -45,17 +45,34 @@ function StickerGenerator() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    setCreatedProduct(null);
+    setStickerModal(null);
     setSubmitting(true);
     try {
       const res = await createProduct(form);
-      setCreatedProduct(res.data.product);
+      setStickerModal(res.data.product);
       setForm((f) => ({ ...f, net_weight: "", gross_weight: "", length: "", width: "" }));
     } catch (err) {
       setError(err.response?.data?.error || "Failed to create product");
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handlePrintSticker = () => {
+    if (!stickerModal) return;
+    const w = window.open("", "_blank", "width=500,height=700");
+    w.document.write(`
+      <html><head><title>Sticker - ${stickerModal.product_number}</title>
+      <style>
+        body { margin: 0; padding: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+        img { max-width: 100%; height: auto; }
+        @media print { body { margin: 0; } }
+      </style></head><body>
+      <img src="${API_BASE}/sticker/${stickerModal.id}" />
+      </body></html>
+    `);
+    w.document.close();
+    w.onload = () => w.print();
   };
 
   const fmtNum = (v) => v != null && v !== "" ? Number(v).toFixed(2) : "-";
@@ -168,64 +185,74 @@ function StickerGenerator() {
         </form>
       </div>
 
-      {/* Sticker Preview — Invoice style matching screenshot */}
-      {createdProduct && (
-        <div className="card">
-          <h3>Sticker Generated &mdash; {createdProduct.product_number}</h3>
-          <div style={{ display: "flex", gap: 24, flexWrap: "wrap", alignItems: "flex-start" }}>
-            {/* Invoice-style preview */}
-            <div style={{
-              flex: "1 1 400px", border: "1px solid #e2e8f0", borderRadius: 10,
-              padding: 24, background: "#fff", maxWidth: 520,
-            }}>
-              <div className="invoice-header">
-                <div className="invoice-brand">
-                  <h2>BHARAT</h2>
-                  <p>MADE IN INDIA</p>
-                  <p>Manufactured by</p>
-                  <p className="company">Tejaswi Nonwovens Pvt Ltd</p>
-                </div>
-                <div className="invoice-qr">
-                  <img src={getStickerPreviewUrl(createdProduct.id)} alt="QR" style={{ width: 120, height: 120 }} />
-                </div>
-              </div>
-              <table className="invoice-table">
-                <tbody>
-                  <tr>
-                    <td className="label">Product No</td>
-                    <td className="value">: {createdProduct.product_number}</td>
-                    <td className="label">Colour</td>
-                    <td className="value">: {createdProduct.colour}</td>
-                  </tr>
-                  <tr>
-                    <td className="label">Length</td>
-                    <td className="value">: {fmtNum(createdProduct.length)}</td>
-                    <td className="label">Width</td>
-                    <td className="value">: {fmtNum(createdProduct.width)}</td>
-                  </tr>
-                  <tr>
-                    <td className="label">Quality</td>
-                    <td className="value">: {createdProduct.quality}</td>
-                    <td className="label">GSM</td>
-                    <td className="value">: {createdProduct.gsm}</td>
-                  </tr>
-                  <tr>
-                    <td className="label">Gross Weight</td>
-                    <td className="value">: {fmtNum(createdProduct.gross_weight)}</td>
-                    <td className="label">Net Weight</td>
-                    <td className="value">: {fmtNum(createdProduct.net_weight)}</td>
-                  </tr>
-                </tbody>
-              </table>
+      {/* Sticker Modal — auto pops up after generation */}
+      {stickerModal && (
+        <div className="modal-overlay" onClick={() => setStickerModal(null)}>
+          <div className="modal invoice-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Sticker Generated &mdash; {stickerModal.product_number}</h2>
+              <button className="modal-close" onClick={() => setStickerModal(null)}>{"\u00D7"}</button>
             </div>
 
-            {/* Actions */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <a href={`${API_BASE}/sticker/${createdProduct.id}`} className="btn btn-primary btn-sm" download>
-                Download Sticker PNG
-              </a>
-              <button className="btn btn-secondary btn-sm" onClick={() => window.print()}>
+            <div className="sticker-success-badge">
+              Added to Inventory
+            </div>
+
+            {/* Invoice-style sticker preview */}
+            <div className="invoice-header">
+              <div className="invoice-brand">
+                <h2>BHARAT</h2>
+                <p>MADE IN INDIA</p>
+                <p>Manufactured by</p>
+                <p className="company">Tejaswi Nonwovens Pvt Ltd</p>
+              </div>
+              <div className="invoice-qr">
+                <img src={getStickerPreviewUrl(stickerModal.id)} alt="QR" style={{ width: 140, height: 140 }} />
+              </div>
+            </div>
+
+            <table className="invoice-table">
+              <tbody>
+                <tr>
+                  <td className="label">Product No</td>
+                  <td className="value">: {stickerModal.product_number}</td>
+                  <td className="label">Colour</td>
+                  <td className="value">: {stickerModal.colour}</td>
+                </tr>
+                <tr>
+                  <td className="label">Length</td>
+                  <td className="value">: {fmtNum(stickerModal.length)}</td>
+                  <td className="label">Width</td>
+                  <td className="value">: {fmtNum(stickerModal.width)}</td>
+                </tr>
+                <tr>
+                  <td className="label">Quality</td>
+                  <td className="value">: {stickerModal.quality}</td>
+                  <td className="label">GSM</td>
+                  <td className="value">: {stickerModal.gsm}</td>
+                </tr>
+                <tr>
+                  <td className="label">Gross Weight</td>
+                  <td className="value">: {fmtNum(stickerModal.gross_weight)}</td>
+                  <td className="label">Net Weight</td>
+                  <td className="value">: {fmtNum(stickerModal.net_weight)}</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div className="invoice-actions">
+              <button className="btn btn-primary btn-sm" onClick={handlePrintSticker}>
                 Print Sticker
+              </button>
+              <a
+                href={`${API_BASE}/sticker/${stickerModal.id}`}
+                className="btn btn-secondary btn-sm"
+                download
+              >
+                Download PNG
+              </a>
+              <button className="btn btn-secondary btn-sm" onClick={() => setStickerModal(null)}>
+                Close
               </button>
             </div>
           </div>
